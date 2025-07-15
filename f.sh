@@ -187,8 +187,13 @@ if [ "$show_tree" = true ] && command -v tree >/dev/null 2>&1; then
   tree_output=$(tree -a $tree_depth -I "node_modules|.git")
 fi
 
-# Initialize output
-output=""
+# Function to strip ANSI escape codes
+strip_ansi() {
+  sed 's/\x1b\[[0-9;]*m//g'
+}
+
+# Initialize output - keep clipboard and terminal output completely separate
+clipboard_output=""
 terminal_output=""
 
 # Add header
@@ -200,19 +205,22 @@ else
   header+=" (all subdirectories)"
 fi
 
-output+="$header\n\n"
-terminal_output+="${CYAN}${BOLD}$header${NC}\n\n"
+# Plain text for clipboard
+clipboard_output+="$header"$'\n\n'
+
+# Colored text for terminal
+terminal_output+="${CYAN}${BOLD}$header${NC}"$'\n\n'
 
 # Add directory structure at the top
 if [ -n "$tree_output" ]; then
-  output+="Directory Structure:\n$tree_output\n\n"
-  terminal_output+="${YELLOW}${BOLD}Directory Structure:${NC}\n$tree_output\n\n"
+  clipboard_output+="Directory Structure:"$'\n'"$tree_output"$'\n\n'
+  terminal_output+="${YELLOW}${BOLD}Directory Structure:${NC}"$'\n'"$tree_output"$'\n\n'
 fi
 
 # Add file contents
 if [ "$show_content" = true ] && [ $file_count -le $max_files ]; then
-  output+="Detailed File Analysis:\n\"\"\"\n\n"
-  terminal_output+="${YELLOW}${BOLD}Detailed File Analysis:${NC}\n${BLUE}\"\"\"${NC}\n\n"
+  clipboard_output+="Detailed File Analysis:"$'\n'"\"\"\""$'\n\n'
+  terminal_output+="${YELLOW}${BOLD}Detailed File Analysis:${NC}"$'\n'"${BLUE}\"\"\"${NC}"$'\n\n'
   
   # Count total line count for repeating directory structure
   total_lines=0
@@ -235,44 +243,42 @@ if [ "$show_content" = true ] && [ $file_count -le $max_files ]; then
     
     # If reaching 1000 lines, add directory structure again for reference
     if [ $total_lines -gt 0 ] && [ $((total_lines % 1000)) -lt $file_line_count ] && [ -n "$tree_output" ]; then
-      output+="\n=== Directory Structure (for reference) ===\n$tree_output\n\n"
-      terminal_output+="\n${YELLOW}${BOLD}=== Directory Structure (for reference) ===${NC}\n$tree_output\n\n"
+      clipboard_output+=$'\n'"=== Directory Structure (for reference) ==="$'\n'"$tree_output"$'\n\n'
+      terminal_output+=$'\n'"${YELLOW}${BOLD}=== Directory Structure (for reference) ===${NC}"$'\n'"$tree_output"$'\n\n'
     fi
     
-    # Add file content
-    file_content="=== Path: $file_path
-=== File: $file_name
-
-"
+    # Prepare file content
+    file_header="=== Path: $file_path"$'\n'"=== File: $file_name"$'\n\n'
     
     if [ -f "$file" ]; then
       # Add file content if file exists and is readable
       if [ -r "$file" ]; then
-        file_content+="$(cat "$file")"
+        file_content=$(cat "$file")
       else
-        file_content+="[File not readable]"
+        file_content="[File not readable]"
       fi
     else
-      file_content+="[Not a file]"
+      file_content="[Not a file]"
     fi
     
-    output+="$file_content\n\n"
-    terminal_output+="${CYAN}$file_content${NC}\n\n"
+    # Add to clipboard output (plain text)
+    clipboard_output+="$file_header$file_content"$'\n\n'
+    
+    # Add to terminal output (with colors)
+    terminal_output+="${CYAN}$file_header$file_content${NC}"$'\n\n'
     
     total_lines=$((total_lines + file_line_count))
   done
   
-  output+="\"\"\"\n\n"
-  terminal_output+="${BLUE}\"\"\"${NC}\n\n"
+  clipboard_output+="\"\"\""$'\n\n'
+  terminal_output+="${BLUE}\"\"\"${NC}"$'\n\n'
 fi
 
 # Add summary
-summary="=== Analysis Summary ===
-Directory: $DIR_NAME
-Total Files Found: $file_count"
+summary="=== Analysis Summary ==="$'\n'"Directory: $DIR_NAME"$'\n'"Total Files Found: $file_count"
 
-output+="$summary\n"
-terminal_output+="${PURPLE}${BOLD}$summary${NC}\n"
+clipboard_output+="$summary"$'\n'
+terminal_output+="${PURPLE}${BOLD}$summary${NC}"$'\n'
 
 # Print the output with colors in terminal
 echo -e "$terminal_output"
@@ -280,13 +286,12 @@ echo -e "$terminal_output"
 # Copy to clipboard if enabled (without color codes)
 if [ "$copy_to_clipboard" = true ]; then
   if [ "$copy_cmd" = "pbcopy" ]; then
-    echo -e "$output" | pbcopy
+    printf "%s" "$clipboard_output" | pbcopy
     echo -e "${GREEN}Results copied to clipboard with pbcopy.${NC}"
   elif [ "$copy_cmd" = "xclip -selection clipboard" ]; then
-    echo -e "$output" | xclip -selection clipboard
+    printf "%s" "$clipboard_output" | xclip -selection clipboard
     echo -e "${GREEN}Results copied to clipboard with xclip.${NC}"
   else
     echo -e "${RED}Warning: pbcopy/xclip not found - couldn't copy to clipboard${NC}"
   fi
 fi
-
