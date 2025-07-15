@@ -184,12 +184,12 @@ if [ "$show_tree" = true ] && command -v tree >/dev/null 2>&1; then
     tree_depth="-L 3"  # Default to showing 3 levels
   fi
   
-  tree_output=$(tree -a $tree_depth -I "node_modules|.git")
+  tree_output=$(tree -a $tree_depth -I "node_modules|.git" | strip_ansi)
 fi
 
 # Function to strip ANSI escape codes
 strip_ansi() {
-  sed 's/\x1b\[[0-9;]*m//g'
+  sed 's/\x1b\[[0-9;]*[mGKH]//g'
 }
 
 # Initialize output - keep clipboard and terminal output completely separate
@@ -280,16 +280,25 @@ summary="=== Analysis Summary ==="$'\n'"Directory: $DIR_NAME"$'\n'"Total Files F
 clipboard_output+="$summary"$'\n'
 terminal_output+="${PURPLE}${BOLD}$summary${NC}"$'\n'
 
+# Add directory structure at the bottom for reference
+if [ -n "$tree_output" ]; then
+  clipboard_output+=$'\n'"Directory Structure (Final Reference):"$'\n'"$tree_output"$'\n'
+  terminal_output+=$'\n'"${YELLOW}${BOLD}Directory Structure (Final Reference):${NC}"$'\n'"$tree_output"$'\n'
+fi
+
 # Print the output with colors in terminal
 echo -e "$terminal_output"
 
 # Copy to clipboard if enabled (without color codes)
 if [ "$copy_to_clipboard" = true ]; then
+  # Strip any remaining ANSI codes from clipboard output
+  clean_output=$(printf "%s" "$clipboard_output" | strip_ansi)
+  
   if [ "$copy_cmd" = "pbcopy" ]; then
-    printf "%s" "$clipboard_output" | pbcopy
+    printf "%s" "$clean_output" | pbcopy
     echo -e "${GREEN}Results copied to clipboard with pbcopy.${NC}"
   elif [ "$copy_cmd" = "xclip -selection clipboard" ]; then
-    printf "%s" "$clipboard_output" | xclip -selection clipboard
+    printf "%s" "$clean_output" | xclip -selection clipboard
     echo -e "${GREEN}Results copied to clipboard with xclip.${NC}"
   else
     echo -e "${RED}Warning: pbcopy/xclip not found - couldn't copy to clipboard${NC}"
