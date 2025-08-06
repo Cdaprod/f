@@ -57,6 +57,30 @@ f ts 2
 f py --no-copy
 ```
 
+### Shorthand Depth with Repeated `f`
+
+Link the script under multiple `f` names to set a default search depth. The
+number of `f` characters in the command determines how many directory levels to
+scan:
+
+```bash
+# One level deep (equivalent to `f 1`)
+f
+
+# Two levels deep
+ff
+
+# Three levels deep
+fff
+```
+
+Create symlinks for the variants you need:
+
+```bash
+ln -s /usr/local/bin/f /usr/local/bin/ff
+ln -s /usr/local/bin/f /usr/local/bin/fff
+```
+
 ### File Type Shortcuts
 
 The script includes built-in shortcuts for common file types:
