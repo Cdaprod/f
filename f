@@ -127,6 +127,13 @@ for arg in "$@"; do
   fi
 done
 
+# Infer default depth from command name if none provided
+script_name=$(basename "$0")
+if [[ $script_name =~ ^f+$ ]] && [ -z "$max_depth" ]; then
+  max_depth=${#script_name}
+  depth="-maxdepth $max_depth"
+fi
+
 # Get current directory name
 DIR_NAME=$(basename "$(pwd)")
 
